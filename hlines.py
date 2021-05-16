@@ -42,8 +42,8 @@ class HLines(inkex.EffectExtension):
         
     def effect(self):
         path_num = 0
-        for elem in self.svg.get_selected(): # for each selected element (Ver. 1.0)
-        #for elem in self.svg.selection.filter(inkex.PathElement).values(): # for each selected element (> Ver. 1.0)
+        #for elem in self.svg.get_selected(): # for each selected element (Ver. 1.0)
+        for elem in self.svg.selection.filter(inkex.PathElement).values(): # for each selected element (Ver. 1.02+)
             #inkex.utils.debug(type(elem))
             #inkex.utils.debug(elem.bounding_box())
             #inkex.utils.debug(elem.path)

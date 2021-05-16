@@ -9,5 +9,5 @@ Installing:
  
 Copy hlines.inx and hlines.py into your Inkscape user extensions directory. Where is that? Open Inkscape and go to the System section of the Preferences menu (Edit --> Preferences --> System). You will find a User extensions item containing the path to your user extensions directory.
  
-NOTE: As of this time, this extension works under Inkscape 1.0, but not the 1.1 release candidate. However, it will work on 1.1 (and above) by commenting out line 45 of hlines.py and uncommenting line 46.
+NOTE: As of this time, this extension works under Inkscape version 1.02 and above, but not version 1.0. However, it will work on 1.0 by commenting out line 46 of hlines.py and uncommenting line 45.
  
