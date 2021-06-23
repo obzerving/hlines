@@ -28,94 +28,121 @@ from lxml import etree
 import math
 
 class HLines(inkex.EffectExtension):
-    def add_arguments(self, pars):
-        pars.add_argument("--my_option", type=inkex.Boolean,\
-            help="An example option, put your options here")
 
-    #draw an SVG line segment between the given (raw) points
-    def drawline(self, dstr, name, parent):
+    #draw SVG line segment(s) between the given (raw) points
+    def drawline(self, dstr, name, parent, sstr=None):
         line_style   = {'stroke':'#000000','stroke-width':'1','fill':'none'}
-        line_attribs = {'style' : str(inkex.Style(line_style)),
-                    inkex.addNS('label','inkscape') : name,
-                    'd' : dstr}
-        line = etree.SubElement(parent, inkex.addNS('path','svg'), line_attribs )
+        if sstr == None:
+            stylestr = str(inkex.Style(line_style))
+        else:
+            stylestr = sstr
+        el = parent.add(inkex.PathElement())
+        el.path = dstr
+        el.style = sstr
+        el.label = name
         
     def effect(self):
         path_num = 0
-        #for elem in self.svg.get_selected(): # for each selected element (Ver. 1.0)
-        for elem in self.svg.selection.filter(inkex.PathElement).values(): # for each selected element (Ver. 1.02+)
-            #inkex.utils.debug(type(elem))
-            #inkex.utils.debug(elem.bounding_box())
-            #inkex.utils.debug(elem.path)
-            if elem.typename == 'PathElement': # Only process path elements
-                xbound,ybound = elem.bounding_box() # Get bounds of this element
-                xmin,xmax = xbound
-                ymin,ymax = ybound
-                ntotal = len(elem.path)
-                nodecnt = 0
-                startx = 0
-                starty = ymax + 10
-                endx = 0
-                endy = starty
-                xoffset = 0
-                orig_sx = 0
-                orig_sy = 0
-                orig_ex = 0
-                orig_ey = 0
-                sx1 = 0
-                sy1 = 0
-                orig_length = 0
-                last_letter = 'M'
-                for ptoken in elem.path: # For each point in the path
-                    #inkex.utils.debug(type(ptoken))
-                    #inkex.utils.debug(ptoken)
-                    startx = xmin + xoffset
-                    if ptoken.letter == 'M': # Starting a new line
-                        orig_sx = ptoken.x
-                        orig_sy = ptoken.y
-                        cd = 'M '+ str(startx) + ',' + str(starty)
-                        sx1 = orig_sx
-                        sy1 = orig_sy
+        elems = []
+        for selem in self.svg.selection.filter(inkex.PathElement):
+            elems.append(selem)
+        if len(elems) == 0:
+            raise inkex.AbortExtension("Nothing selected")
+        for elem in elems:
+            escale = 1.0
+            if 'transform' in elem.attrib:
+                transforms = elem.attrib['transform'].split()
+                for tf in transforms:
+                    if tf.startswith('scale'):
+                        escale = float(tf.split('(')[1].split(')')[0])
+            # Get style of original polygon
+            if 'style' in elem.attrib:
+                sstr = elem.attrib['style']
+                if not math.isclose(escale, 1.0):
+                    lsstr = sstr.split(';')
+                    for stoken in range(len(lsstr)):
+                        if lsstr[stoken].startswith('stroke-width'):
+                            swt = lsstr[stoken].split(':')[1]
+                            swf = str(float(swt)*escale)
+                            lsstr[stoken] = lsstr[stoken].replace(swt, swf)
+                        if lsstr[stoken].startswith('stroke-miterlimit'):
+                            swt = lsstr[stoken].split(':')[1]
+                            swf = str(float(swt)*escale)
+                            lsstr[stoken] = lsstr[stoken].replace(swt, swf)
+                    sstr = ";".join(lsstr)
+            else:
+                sstr = None
+
+            xbound,ybound = elem.bounding_box() # Get bounds of this element
+            xmin,xmax = xbound
+            ymin,ymax = ybound
+            xmin *= escale
+            ymin *= escale
+            xmax *= escale
+            ymax *= escale
+            ntotal = len(elem.path)
+            nodecnt = 0
+            startx = 0
+            starty = ymax + 10
+            endx = 0
+            endy = starty
+            xoffset = 0
+            orig_sx = 0
+            orig_sy = 0
+            orig_ex = 0
+            orig_ey = 0
+            sx1 = 0
+            sy1 = 0
+            orig_length = 0
+            last_letter = 'M'
+            for ptoken in elem.path: # For each point in the path
+                startx = xmin + xoffset
+                if ptoken.letter == 'M': # Starting a new line
+                    orig_sx = ptoken.x * escale
+                    orig_sy = ptoken.y * escale
+                    cd = 'M '+ str(startx) + ',' + str(starty)
+                    sx1 = orig_sx
+                    sy1 = orig_sy
+                else:
+                    if last_letter != 'M':
+                        orig_sx = orig_ex
+                        orig_sy = orig_ey
+                    
+                    if ptoken.letter == 'L':
+                        orig_ex = ptoken.x * escale
+                        orig_ey = ptoken.y * escale
+                        orig_length = math.sqrt((orig_sx-orig_ex)**2 + (orig_sy-orig_ey)**2)
+                        endx = startx + orig_length
+                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
+                    elif ptoken.letter == 'H':
+                        if last_letter == 'M':
+                            orig_ey = orig_sy
+                        orig_length = abs(orig_sx - ptoken.x * escale)
+                        orig_ex = ptoken.x * escale
+                        endx = startx + orig_length
+                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
+                    elif ptoken.letter == 'V':
+                        if last_letter == 'M':
+                            orig_ex = orig_sx
+                        orig_length = abs(orig_sy - ptoken.y * escale)
+                        orig_ey = ptoken.y * escale
+                        endx = startx + orig_length
+                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
+                    elif ptoken.letter == 'Z':
+                        orig_ex = sx1
+                        orig_ey = sy1
+                        orig_length = math.sqrt((orig_sx-orig_ex)**2 + (orig_sy-orig_ey)**2)
+                        endx = startx + orig_length
+                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
                     else:
-                        if last_letter != 'M':
-                            orig_sx = orig_ex
-                            orig_sy = orig_ey
-                        
-                        if ptoken.letter == 'L':
-                            orig_ex = ptoken.x
-                            orig_ey = ptoken.y
-                            orig_length = math.sqrt((orig_sx-orig_ex)**2 + (orig_sy-orig_ey)**2)
-                            endx = startx + orig_length
-                            cd = cd + ' L ' + str(endx) + ',' + str(endy)
-                        elif ptoken.letter == 'H':
-                            if last_letter == 'M':
-                                orig_ey = orig_sy
-                            orig_length = abs(orig_sx - ptoken.x)
-                            orig_ex = ptoken.x
-                            endx = startx + orig_length
-                            cd = cd + ' L ' + str(endx) + ',' + str(endy)
-                        elif ptoken.letter == 'V':
-                            if last_letter == 'M':
-                                orig_ex = orig_sx
-                            orig_length = abs(orig_sy - ptoken.y)
-                            orig_ey = ptoken.y
-                            endx = startx + orig_length
-                            cd = cd + ' L ' + str(endx) + ',' + str(endy)
-                        elif ptoken.letter == 'Z':
-                            orig_ex = sx1
-                            orig_ey = sy1
-                            orig_length = math.sqrt((orig_sx-orig_ex)**2 + (orig_sy-orig_ey)**2)
-                            endx = startx + orig_length
-                            cd = cd + ' L ' + str(endx) + ',' + str(endy)
-                        else:
-                            inkex.utils.debug("Unknown letter - {0}".format(ptoken.letter))
-                    nodecnt = nodecnt + 1
-                    if ptoken.letter != 'M':
-                        if nodecnt == ntotal:
-                            self.drawline(cd,"hline{0}".format(path_num),self.svg.get_current_layer())
-                            path_num = path_num + 1
-                        xoffset = xoffset + orig_length
-                    last_letter = ptoken.letter
+                        raise inkex.AbortExtension("Unknown letter - {0}".format(ptoken.letter))
+                nodecnt = nodecnt + 1
+                if ptoken.letter != 'M':
+                    if nodecnt == ntotal:
+                        self.drawline(cd,"hline{0}".format(path_num),self.svg.get_current_layer(),sstr)
+                        path_num = path_num + 1
+                    xoffset = xoffset + orig_length
+                last_letter = ptoken.letter
 
 if __name__ == '__main__':
     HLines().run()
