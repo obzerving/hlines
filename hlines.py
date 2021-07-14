@@ -24,7 +24,6 @@ line segments.
 """
 
 import inkex
-from lxml import etree
 import math
 
 class HLines(inkex.EffectExtension):
@@ -38,7 +37,7 @@ class HLines(inkex.EffectExtension):
             stylestr = sstr
         el = parent.add(inkex.PathElement())
         el.path = dstr
-        el.style = sstr
+        el.style = stylestr
         el.label = name
         
     def effect(self):
