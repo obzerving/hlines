@@ -25,6 +25,10 @@ line segments.
 
 import inkex
 import math
+import copy
+
+from inkex import PathElement, Style
+from inkex.paths import Move, Line, ZoneClose, Path
 
 class HLines(inkex.EffectExtension):
 
@@ -32,10 +36,10 @@ class HLines(inkex.EffectExtension):
     def drawline(self, dstr, name, parent, sstr=None):
         line_style   = {'stroke':'#000000','stroke-width':'1','fill':'none'}
         if sstr == None:
-            stylestr = str(inkex.Style(line_style))
+            stylestr = str(Style(line_style))
         else:
             stylestr = sstr
-        el = parent.add(inkex.PathElement())
+        el = parent.add(PathElement())
         el.path = dstr
         el.style = stylestr
         el.label = name
@@ -43,21 +47,24 @@ class HLines(inkex.EffectExtension):
     def effect(self):
         path_num = 0
         elems = []
-        for selem in self.svg.selection.filter(inkex.PathElement):
-            elems.append(selem)
+        npaths = []
+        sstr = None
+        for selem in self.svg.selection.filter(PathElement):
+            elems.append(copy.deepcopy(selem))
         if len(elems) == 0:
             raise inkex.AbortExtension("Nothing selected")
         for elem in elems:
             escale = 1.0
+            npaths.clear()
+            #inkex.utils.debug(elem.attrib)
+            if 'style' in elem.attrib:
+                sstr = elem.attrib['style']
             if 'transform' in elem.attrib:
                 transforms = elem.attrib['transform'].split()
                 for tf in transforms:
                     if tf.startswith('scale'):
                         escale = float(tf.split('(')[1].split(')')[0])
-            # Get style of original polygon
-            if 'style' in elem.attrib:
-                sstr = elem.attrib['style']
-                if not math.isclose(escale, 1.0):
+                if sstr != None:
                     lsstr = sstr.split(';')
                     for stoken in range(len(lsstr)):
                         if lsstr[stoken].startswith('stroke-width'):
@@ -69,20 +76,16 @@ class HLines(inkex.EffectExtension):
                             swf = str(float(swt)*escale)
                             lsstr[stoken] = lsstr[stoken].replace(swt, swf)
                     sstr = ";".join(lsstr)
-            else:
-                sstr = None
-
+                else:
+                    sstr = None
+                elem.apply_transform()
             xbound,ybound = elem.bounding_box() # Get bounds of this element
             xmin,xmax = xbound
             ymin,ymax = ybound
-            xmin *= escale
-            ymin *= escale
-            xmax *= escale
-            ymax *= escale
             ntotal = len(elem.path)
             nodecnt = 0
             startx = 0
-            starty = ymax + 10
+            starty = ymax + 10*escale
             endx = 0
             endy = starty
             xoffset = 0
@@ -93,13 +96,13 @@ class HLines(inkex.EffectExtension):
             sx1 = 0
             sy1 = 0
             orig_length = 0
-            last_letter = 'M'
             for ptoken in elem.path: # For each point in the path
                 startx = xmin + xoffset
                 if ptoken.letter == 'M': # Starting a new line
-                    orig_sx = ptoken.x * escale
-                    orig_sy = ptoken.y * escale
-                    cd = 'M '+ str(startx) + ',' + str(starty)
+                    orig_sx = ptoken.x
+                    orig_sy = ptoken.y
+                    cd = Path()
+                    cd.append(Move(startx,starty))
                     sx1 = orig_sx
                     sy1 = orig_sy
                 else:
@@ -108,37 +111,35 @@ class HLines(inkex.EffectExtension):
                         orig_sy = orig_ey
                     
                     if ptoken.letter == 'L':
-                        orig_ex = ptoken.x * escale
-                        orig_ey = ptoken.y * escale
+                        orig_ex = ptoken.x
+                        orig_ey = ptoken.y
                         orig_length = math.sqrt((orig_sx-orig_ex)**2 + (orig_sy-orig_ey)**2)
                         endx = startx + orig_length
-                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
+                        cd.append(Line(endx,endy))
                     elif ptoken.letter == 'H':
-                        if last_letter == 'M':
-                            orig_ey = orig_sy
-                        orig_length = abs(orig_sx - ptoken.x * escale)
-                        orig_ex = ptoken.x * escale
+                        orig_ey = ptoken.Horz.to_line().y
+                        orig_length = abs(orig_sx - ptoken.x)
+                        orig_ex = ptoken.x
                         endx = startx + orig_length
-                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
+                        cd.append(Line(endx,endy))
                     elif ptoken.letter == 'V':
-                        if last_letter == 'M':
-                            orig_ex = orig_sx
-                        orig_length = abs(orig_sy - ptoken.y * escale)
-                        orig_ey = ptoken.y * escale
+                        orig_ex = ptoken.Vert.to_line().x
+                        orig_length = abs(orig_sy - ptoken.y)
+                        orig_ey = ptoken.y
                         endx = startx + orig_length
-                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
+                        cd.append(Line(endx,endy))
                     elif ptoken.letter == 'Z':
                         orig_ex = sx1
                         orig_ey = sy1
                         orig_length = math.sqrt((orig_sx-orig_ex)**2 + (orig_sy-orig_ey)**2)
                         endx = startx + orig_length
-                        cd = cd + ' L ' + str(endx) + ',' + str(endy)
+                        cd.append(Line(endx,endy))
                     else:
                         raise inkex.AbortExtension("Unknown letter - {0}".format(ptoken.letter))
                 nodecnt = nodecnt + 1
                 if ptoken.letter != 'M':
                     if nodecnt == ntotal:
-                        self.drawline(cd,"hline{0}".format(path_num),self.svg.get_current_layer(),sstr)
+                        self.drawline(str(cd),"hline{0}".format(path_num),self.svg.get_current_layer(),sstr)
                         path_num = path_num + 1
                     xoffset = xoffset + orig_length
                 last_letter = ptoken.letter
