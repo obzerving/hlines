@@ -29,6 +29,7 @@ import copy
 
 from inkex import PathElement, Style
 from inkex.paths import Move, Line, ZoneClose, Path
+from inkex.transforms import Vector2d
 
 class HLines(inkex.EffectExtension):
 
@@ -96,7 +97,8 @@ class HLines(inkex.EffectExtension):
             sx1 = 0
             sy1 = 0
             orig_length = 0
-            for ptoken in elem.path: # For each point in the path
+            prev = Vector2d()
+            for ptoken in elem.path.to_absolute(): # For each point in the path
                 startx = xmin + xoffset
                 if ptoken.letter == 'M': # Starting a new line
                     orig_sx = ptoken.x
@@ -117,13 +119,13 @@ class HLines(inkex.EffectExtension):
                         endx = startx + orig_length
                         cd.append(Line(endx,endy))
                     elif ptoken.letter == 'H':
-                        orig_ey = ptoken.Horz.to_line().y
+                        orig_ey = ptoken.to_line(prev).y
                         orig_length = abs(orig_sx - ptoken.x)
                         orig_ex = ptoken.x
                         endx = startx + orig_length
                         cd.append(Line(endx,endy))
                     elif ptoken.letter == 'V':
-                        orig_ex = ptoken.Vert.to_line().x
+                        orig_ex = ptoken.to_line(prev).x
                         orig_length = abs(orig_sy - ptoken.y)
                         orig_ey = ptoken.y
                         endx = startx + orig_length
@@ -142,6 +144,11 @@ class HLines(inkex.EffectExtension):
                         self.drawline(str(cd),"hline{0}".format(path_num),self.svg.get_current_layer(),sstr)
                         path_num = path_num + 1
                     xoffset = xoffset + orig_length
+                    prev.x = orig_ex
+                    prev.y = orig_ey
+                else:
+                    prev.x = orig_sx
+                    prev.y = orig_sy
                 last_letter = ptoken.letter
 
 if __name__ == '__main__':
