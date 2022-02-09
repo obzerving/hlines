@@ -70,12 +70,14 @@ class HLines(inkex.EffectExtension):
                     for stoken in range(len(lsstr)):
                         if lsstr[stoken].startswith('stroke-width'):
                             swt = lsstr[stoken].split(':')[1]
-                            swf = str(float(swt)*escale)
-                            lsstr[stoken] = lsstr[stoken].replace(swt, swf)
+                            if not swt[2:].isalpha(): # is value expressed in units (e.g. px)?
+                                swf = str(float(swt)*escale) # no. scale it
+                                lsstr[stoken] = lsstr[stoken].replace(swt, swf)
                         if lsstr[stoken].startswith('stroke-miterlimit'):
                             swt = lsstr[stoken].split(':')[1]
-                            swf = str(float(swt)*escale)
-                            lsstr[stoken] = lsstr[stoken].replace(swt, swf)
+                            if not swt[2:].isalpha(): # is value expressed in units (e.g. px)?
+                                swf = str(float(swt)*escale) # no. scale it
+                                lsstr[stoken] = lsstr[stoken].replace(swt, swf)
                     sstr = ";".join(lsstr)
                 else:
                     sstr = None
