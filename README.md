@@ -1,7 +1,9 @@
 # hlines
  Inkscape extension for "unwinding" paths
 
-For each selected path element, this extension creates an additional path element consisting of horizontal line segments which are the same size as the originalline segments.
+For each selected path element, this extension creates an additional path element consisting of horizontal line segments which are the same size as the original line segments.
+
+Updated to work with a mix of straight lines and curves.
 
 Installing:
  

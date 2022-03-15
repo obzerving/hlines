@@ -27,7 +27,7 @@ import inkex
 import math
 import copy
 
-from inkex import PathElement, Style
+from inkex import PathElement, Style, bezier
 from inkex.paths import Move, Line, ZoneClose, Path
 from inkex.transforms import Vector2d
 
@@ -136,6 +136,14 @@ class HLines(inkex.EffectExtension):
                         orig_ex = sx1
                         orig_ey = sy1
                         orig_length = math.sqrt((orig_sx-orig_ex)**2 + (orig_sy-orig_ey)**2)
+                        endx = startx + orig_length
+                        cd.append(Line(endx,endy))
+                    elif ptoken.letter == 'C':
+                        bez = ptoken.to_bez() # [[x0,y0][x1,y1][x2,y2][x3,y3]]
+                        bez.insert(0,[prev.x,prev.y])
+                        orig_ex = bez[3][0] #x3
+                        orig_ey = bez[3][1] #y3
+                        orig_length = inkex.bezier.bezierlength(bez)
                         endx = startx + orig_length
                         cd.append(Line(endx,endy))
                     else:
